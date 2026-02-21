@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // --- CONFIGURAÇÕES ---
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // --- FUNÇÕES DO BANCO ---
 
@@ -113,10 +113,13 @@ async function processarComando(mensagem) {
 WPPConnect.create({
     session: 'bot-marmitas',
     headless: true,
-    useChrome: true,
-    devtools: false,
+    useChrome: false,
+    puppeteerOptions: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
 })
-.then((client) => start(client));
+.then((client) => start(client))
+.catch((error) => console.log(error));
 
 function start(client) {
     console.log('🤖 Bot iniciado! Escaneie o QR Code se necessário.');
@@ -161,3 +164,4 @@ function start(client) {
     });
 
 }
+
