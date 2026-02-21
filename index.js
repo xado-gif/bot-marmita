@@ -7,7 +7,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // --- CONFIGURAÇÕES ---
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getModel('gemini-pro');
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
 // --- FUNÇÕES DO BANCO ---
 
@@ -159,4 +159,5 @@ function start(client) {
             }
         })();
     });
+
 }
