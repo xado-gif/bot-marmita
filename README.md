@@ -1,2 +1,4 @@
 # bot-marmita
-*** Banco de dados como Data Viz em HTML, usado SupaBase - Google Ai Stude - Render
+*** Banco de dados como Data Viz em HTML***
+Ferramentas usadas:
+SupaBase - Google Ai Stude - Render
