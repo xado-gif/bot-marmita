@@ -1,0 +1,19 @@
+{
+  "name": "bot-marmitas",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.97.0",
+    "@wppconnect-team/wppconnect": "^1.38.0",
+    "dotenv": "^17.3.1"
+  }
+}

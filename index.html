@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão Marmitas AI</title>
+    <!-- Tailwind CSS para estilização rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans">
+
+    <!-- Header -->
+    <header class="bg-emerald-600 p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">🍱 Gestão Marmitas AI</h1>
+            <span class="text-sm bg-emerald-800 px-3 py-1 rounded-full">Online</span>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+
+        <!-- Card: Faturamento -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-blue-500">
+            <h3 class="text-gray-400 text-sm uppercase">Faturamento Total</h3>
+            <p class="text-3xl font-bold mt-2" id="faturamento">R$ 0,00</p>
+        </div>
+
+        <!-- Card: Custos Totais -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-red-500">
+            <h3 class="text-gray-400 text-sm uppercase">Custo Total</h3>
+            <p class="text-3xl font-bold mt-2" id="custos">R$ 0,00</p>
+        </div>
+
+        <!-- Card: Lucro -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-green-500">
+            <h3 class="text-gray-400 text-sm uppercase">Lucro Líquido</h3>
+            <p class="text-3xl font-bold mt-2" id="lucro">R$ 0,00</p>
+        </div>
+
+        <!-- Card: Margem -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md border-l-4 border-yellow-500">
+            <h3 class="text-gray-400 text-sm uppercase">Margem de Lucro</h3>
+            <p class="text-3xl font-bold mt-2" id="margem">0%</p>
+        </div>
+    </div>
+
+    <!-- Gráficos e Tabelas -->
+    <div class="container mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+        
+        <!-- Gráfico de Pizza (Custos vs Lucro) -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-bold mb-4">Resumo Financeiro</h3>
+            <canvas id="financeiroChart"></canvas>
+        </div>
+
+        <!-- Lista de Ingredientes (Custos) -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-bold mb-4">Ingredientes & Custos</h3>
+            <div class="overflow-y-auto h-64">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-gray-400 border-b border-gray-700">
+                            <th class="pb-2">Item</th>
+                            <th class="pb-2">Custo</th>
+                            <th class="pb-2 text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabela-ingredientes">
+                        <!-- Dados carregados via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Vendas Recentes -->
+    <div class="container mx-auto p-4 mt-4">
+        <div class="bg-gray-800 p-6 rounded-xl shadow-md">
+            <h3 class="text-xl font-bold mb-4">Últimas Vendas</h3>
+            <table class="w-full text-left">
+                <thead>
+                    <tr class="text-gray-400 border-b border-gray-700">
+                        <th class="pb-2">Data</th>
+                        <th class="pb-2">Produto</th>
+                        <th class="pb-2">Venda (R$)</th>
+                        <th class="pb-2">Custo (R$)</th>
+                        <th class="pb-2 text-right">Lucro (R$)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-vendas">
+                    <!-- Dados carregados via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Conexão e Lógica -->
+    <script>
+        // --- CONFIGURAÇÃO DO SUPABASE (Cole aqui suas chaves) ---
+        const SUPABASE_URL = 'odhdhqjctwhfxpdlsqfc';
+        const SUPABASE_KEY = 'odhdhqjctwhfxpdlsqfc';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // --- LÓGICA DO DASHBOARD ---
+        async function carregarDados() {
+            
+            // 1. Buscar Vendas
+            const { data: vendas, error: erroVendas } = await supabase
+                .from('vendas')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            // 2. Buscar Ingredientes
+            const { data: ingredientes, error: erroIngredientes } = await supabase
+                .from('ingredientes')
+                .select('*');
+
+            if (erroVendas || erroIngredientes) {
+                console.error("Erro ao carregar dados:", erroVendas || erroIngredientes);
+                return;
+            }
+
+            // Calcular Financeiro
+            let totalVendas = 0;
+            let totalCustos = 0;
+
+            // Renderizar Vendas na Tabela
+            const tabelaVendas = document.getElementById('tabela-vendas');
+            tabelaVendas.innerHTML = '';
+            
+            vendas.forEach(venda => {
+                totalVendas += venda.valor_venda;
+                totalCustos += venda.custo_producao;
+                
+                const lucro = venda.valor_venda - venda.custo_producao;
+                const dataFormatada = new Date(venda.created_at).toLocaleDateString('pt-BR');
+
+                tabelaVendas.innerHTML += `
+                    <tr class="border-b border-gray-700 hover:bg-gray-700">
+                        <td class="py-2">${dataFormatada}</td>
+                        <td class="py-2">${venda.produto}</td>
+                        <td class="py-2 text-green-400">+${venda.valor_venda.toFixed(2)}</td>
+                        <td class="py-2 text-red-400">-${venda.custo_producao.toFixed(2)}</td>
+                        <td class="py-2 text-right font-bold ${lucro >= 0 ? 'text-blue-300' : 'text-red-500'}">${lucro.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            // Renderizar Ingredientes
+            const tabelaIng = document.getElementById('tabela-ingredientes');
+            tabelaIng.innerHTML = '';
+            ingredientes.forEach(ing => {
+                tabelaIng.innerHTML += `
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2">${ing.nome}</td>
+                        <td class="py-2 text-yellow-400">R$ ${ing.custo.toFixed(2)}</td>
+                        <td class="py-2 text-right">
+                            <button class="text-xs bg-gray-600 px-2 py-1 rounded hover:bg-gray-500">Editar</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            // Atualizar Cards
+            const lucroTotal = totalVendas - totalCustos;
+            const margem = totalVendas > 0 ? ((lucroTotal / totalVendas) * 100).toFixed(1) : 0;
+
+            document.getElementById('faturamento').innerText = `R$ ${totalVendas.toFixed(2)}`;
+            document.getElementById('custos').innerText = `R$ ${totalCustos.toFixed(2)}`;
+            document.getElementById('lucro').innerText = `R$ ${lucroTotal.toFixed(2)}`;
+            document.getElementById('margem').innerText = `${margem}%`;
+
+            // Atualizar Gráfico
+            atualizarGrafico(totalCustos, lucroTotal);
+        }
+
+        // --- GRÁFICO ---
+        let chartInstance = null;
+        function atualizarGrafico(custos, lucro) {
+            const ctx = document.getElementById('financeiroChart').getContext('2d');
+            
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Custos', 'Lucro'],
+                    datasets: [{
+                        data: [custos, lucro],
+                        backgroundColor: ['#ef4444', '#10b981'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#fff' } }
+                    }
+                }
+            });
+        }
+
+        // Carregar ao iniciar
+        carregarDados();
+
+    </script>
+</body>
+</html>
