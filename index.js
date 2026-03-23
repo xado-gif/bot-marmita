@@ -1,15 +1,26 @@
 require('dotenv').config();
-const fs = require('fs');
+
 const { createClient } = require('@supabase/supabase-js');
 const WPPConnect = require('@wppconnect-team/wppconnect');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// --- CONFIGURAÇÕES ---
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+// =============================
+// CONFIGURAÇÕES
+// =============================
 
-// --- FUNÇÕES DO BANCO ---
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+console.log("SUPABASE_URL:", supabaseUrl);
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// =============================
+// FUNÇÕES DO BANCO
+// =============================
 
 // Buscar ingrediente
 async function buscarIngrediente(nome) {
@@ -17,151 +28,224 @@ async function buscarIngrediente(nome) {
         .from('ingredientes')
         .select('*')
         .ilike('nome', `%${nome}%`);
+
     return data;
 }
 
 // Atualizar custo
 async function atualizarCusto(nome, novoCusto) {
+
     const { data: existentes } = await supabase
         .from('ingredientes')
         .select('id')
         .ilike('nome', `%${nome}%`);
 
     if (existentes && existentes.length > 0) {
+
         await supabase
             .from('ingredientes')
             .update({ custo: novoCusto })
             .eq('id', existentes[0].id);
+
         return "Custo atualizado com sucesso!";
+
     } else {
+
         await supabase
             .from('ingredientes')
-            .insert({ nome: nome, custo: novoCusto, unidade: 'un' });
+            .insert({
+                nome: nome,
+                custo: novoCusto,
+                unidade: 'un'
+            });
+
         return "Novo ingrediente cadastrado!";
     }
 }
 
 // Registrar venda
 async function registrarVenda(produto, valorVenda, custoProducao) {
-    const { data, error } = await supabase
+
+    const { error } = await supabase
         .from('vendas')
-        .insert([{ 
-            produto: produto, 
-            valor_venda: valorVenda, 
-            custo_producao: custoProducao 
+        .insert([{
+            produto: produto,
+            valor_venda: valorVenda,
+            custo_producao: custoProducao
         }]);
 
-    if (error) return "Erro ao salvar venda.";
-    
+    if (error) {
+        console.log(error);
+        return "Erro ao salvar venda.";
+    }
+
     const lucro = valorVenda - custoProducao;
-    return `Venda registrada!\nProduto: ${produto}\nVenda: R$ ${valorVenda}\nCusto: R$ ${custoProducao}\nLucro: R$ ${lucro}`;
+
+    return `Venda registrada!
+Produto: ${produto}
+Venda: R$ ${valorVenda}
+Custo: R$ ${custoProducao}
+Lucro: R$ ${lucro}`;
 }
 
-// Buscar relatórios
+// Relatório
 async function gerarRelatorio() {
-    const { data: vendas } = await supabase.from('vendas').select('*');
-    const { data: ingredientes } = await supabase.from('ingredientes').select('*');
 
-    let fat = 0, cust = 0;
-    vendas.forEach(v => { fat += v.valor_venda; cust += v.custo_producao; });
-    const lucro = fat - cust;
-    const margem = fat > 0 ? ((lucro / fat) * 100).toFixed(1) : 0;
+    const { data: vendas } = await supabase
+        .from('vendas')
+        .select('*');
+
+    const { data: ingredientes } = await supabase
+        .from('ingredientes')
+        .select('*');
+
+    let faturamento = 0;
+    let custos = 0;
+
+    vendas.forEach(v => {
+        faturamento += v.valor_venda;
+        custos += v.custo_producao;
+    });
+
+    const lucro = faturamento - custos;
+
+    const margem = faturamento > 0
+        ? ((lucro / faturamento) * 100).toFixed(1)
+        : 0;
 
     return `
-📊 *RELATÓRIO FINANCEIRO*
+📊 RELATÓRIO FINANCEIRO
 
-💰 Faturamento: R$ ${fat.toFixed(2)}
-📉 Custos: R$ ${cust.toFixed(2)}
+💰 Faturamento: R$ ${faturamento.toFixed(2)}
+📉 Custos: R$ ${custos.toFixed(2)}
 ✅ Lucro: R$ ${lucro.toFixed(2)}
 📈 Margem: ${margem}%
 
 🥦 Ingredientes cadastrados: ${ingredientes.length}
-    `.trim();
+`.trim();
+
 }
 
-// --- INTELIGÊNCIA ARTIFICIAL ---
+// =============================
+// INTELIGÊNCIA ARTIFICIAL
+// =============================
 
 async function processarComando(mensagem) {
+
     const prompt = `
-    Você é um assistente de gestão para um delivery de marmitas.
-    Analise a mensagem do usuário e determine a ação.
+Você é um assistente de gestão para um delivery de marmitas.
 
-    Mensagem: "${mensagem}"
+Mensagem do usuário:
+"${mensagem}"
 
-    Regras:
-    1. Se for pedido para alterar/cadastrar custo de ingrediente (ex: "altera custo arroz 5" ou "cadastra tomate 10"), retorne no formato: ACAO:ATUALIZAR_CUSTO|ITEM:arroz|VALOR:5
-    2. Se for pedido para registrar venda (ex: "venda marmita 30 custo 18"), retorne: ACAO:REGISTRAR_VENDA|PRODUTO:marmita|VALOR:30|CUSTO:18
-    3. Se for pedido relatório ou análise, retorne: ACAO:RELATORIO
-    4. Se não entender, retorne: ACAO:NAO_ENTENDI
+Regras:
 
-    Responda APENAS com o código formatado acima.
-    `;
+1 - Se for alteração de custo
+ACAO:ATUALIZAR_CUSTO|ITEM:arroz|VALOR:5
+
+2 - Se for registro de venda
+ACAO:REGISTRAR_VENDA|PRODUTO:marmita|VALOR:30|CUSTO:18
+
+3 - Se pedir relatório
+ACAO:RELATORIO
+
+4 - Se não entender
+ACAO:NAO_ENTENDI
+
+Responda apenas com o código.
+`;
 
     try {
+
         const result = await model.generateContent(prompt);
         const resposta = result.response.text().trim();
+
         console.log("IA decidiu:", resposta);
+
         return resposta;
-    } catch (e) {
-        console.log("Erro na IA:", e);
+
+    } catch (error) {
+
+        console.log("Erro IA:", error);
+
         return "ACAO:NAO_ENTENDI";
+
     }
+
 }
 
-// --- INICIALIZAÇÃO DO WHATSAPP ---
+// =============================
+// WHATSAPP BOT
+// =============================
 
 WPPConnect.create({
+
     session: 'bot-marmitas',
     headless: true,
     useChrome: false,
+
     puppeteerOptions: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
+
 })
 .then((client) => start(client))
 .catch((error) => console.log(error));
 
 function start(client) {
-    console.log('🤖 Bot iniciado! Escaneie o QR Code se necessário.');
 
-    client.onMessage((message) => {
-        // Ignorar mensagens de grupos ou audios/imagens
-        if (message.isGroupMsg || message.type !== 'chat') return;
-        
-        // Ignorar próprias mensagens (se configurado)
+    console.log("🤖 Bot iniciado!");
+
+    client.onMessage(async (message) => {
+
+        if (message.isGroupMsg) return;
+        if (message.type !== 'chat') return;
+
         if (message.from === process.env.SEU_NUMERO) return;
 
-        const texto = message.body.toLowerCase();
+        const decisao = await processarComando(message.body);
 
-        (async () => {
-            const decisao = await processarComando(message.body);
-            
-            // Parse da decisão da IA
-            if (decisao.includes('ACAO:ATUALIZAR_CUSTO')) {
-                const partes = decisao.split('|');
-                const item = partes[1].replace('ITEM:', '').trim();
-                const valor = parseFloat(partes[2].replace('VALOR:', '').trim());
-                const resp = await atualizarCusto(item, valor);
-                client.sendText(message.from, resp);
-            } 
-            else if (decisao.includes('ACAO:REGISTRAR_VENDA')) {
-                const partes = decisao.split('|');
-                const produto = partes[1].replace('PRODUTO:', '').trim();
-                const valor = parseFloat(partes[2].replace('VALOR:', '').trim());
-                const custo = parseFloat(partes[3].replace('CUSTO:', '').trim());
-                const resp = await registrarVenda(produto, valor, custo);
-                client.sendText(message.from, resp);
-            }
-            else if (decisao.includes('ACAO:RELATORIO')) {
-                const resp = await gerarRelatorio();
-                client.sendText(message.from, resp);
-            }
-            else {
-                // Mensagemoa de menu de ajuda
-                client.sendText(message.from, `Olá! Sou seu assistente de gestão.\n\nComandos disponíveis:\n• "Altera custo arroz 5" (Custo)\n• "Venda marmita 30 custo 18" (Venda)\n• "Relatório" (Dados)`);
-            }
-        })();
+        if (decisao.includes("ACAO:ATUALIZAR_CUSTO")) {
+
+            const partes = decisao.split("|");
+
+            const item = partes[1].replace("ITEM:", "").trim();
+            const valor = parseFloat(partes[2].replace("VALOR:", "").trim());
+
+            const resp = await atualizarCusto(item, valor);
+
+            client.sendText(message.from, resp);
+
+        }
+
+        else if (decisao.includes("ACAO:REGISTRAR_VENDA")) {
+
+            const partes = decisao.split("|");
+
+            const produto = partes[1].replace("PRODUTO:", "").trim();
+            const valor = parseFloat(partes[2].replace("VALOR:", "").trim());
+            const custo = parseFloat(partes[3].replace("CUSTO:", "").trim());
+
+            const resp = await registrarVenda(produto, valor, custo);
+
+            client.sendText(message.from, resp);
+
+        }
+
+        else if (decisao.includes("ACAO:RELATORIO")) {
+
+            const rel = await gerarRelatorio();
+
+            client.sendText(message.from, rel);
+
+        }
+
+        else {
+
+            client.sendText(message.from, "Não entendi. Pode repetir?");
+
+        }
+
     });
 
 }
-
