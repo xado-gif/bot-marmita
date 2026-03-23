@@ -179,15 +179,15 @@ Responda apenas com o código.
 // =============================
 
 WPPConnect.create({
-
-    session: 'bot-marmitas',
-    headless: true,
-    useChrome: false,
-
-    puppeteerOptions: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
-
+  session: 'bot-marmitas',
+  catchQR: (base64Qr) => {
+    console.log('QR Code recebido');
+    require('fs').writeFileSync('qr.png', base64Qr.split(',')[1], { encoding: 'base64' });
+  },
+  headless: true,
+  puppeteerOptions: {
+    args: ['--no-sandbox','--disable-setuid-sandbox']
+  }
 })
 .then((client) => start(client))
 .catch((error) => console.log(error));
@@ -201,7 +201,7 @@ function start(client) {
         if (message.isGroupMsg) return;
         if (message.type !== 'chat') return;
 
-        if (message.from === process.env.SEU_NUMERO) return;
+        //if (message.from === process.env.SEU_NUMERO) return;
 
         const decisao = await processarComando(message.body);
 
