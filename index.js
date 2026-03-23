@@ -1,8 +1,45 @@
 require('dotenv').config();
 
+const express = require("express");
+const fs = require("fs");
+
 const { createClient } = require('@supabase/supabase-js');
 const WPPConnect = require('@wppconnect-team/wppconnect');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// =============================
+// SERVIDOR WEB (para mostrar QR)
+// =============================
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+let qrCodeBase64 = null;
+
+app.get("/", (req, res) => {
+    res.send("🤖 Bot Marmitas rodando!");
+});
+
+app.get("/qr", (req, res) => {
+
+    if (!qrCodeBase64) {
+        return res.send("QR ainda não foi gerado. Aguarde o bot iniciar.");
+    }
+
+    res.send(`
+        <html>
+            <body style="text-align:center;font-family:sans-serif">
+                <h2>Escaneie o QR Code</h2>
+                <img src="${qrCodeBase64}" />
+            </body>
+        </html>
+    `);
+
+});
+
+app.listen(PORT, () => {
+    console.log("🌐 Servidor web rodando na porta", PORT);
+});
 
 // =============================
 // CONFIGURAÇÕES
@@ -24,6 +61,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // Buscar ingrediente
 async function buscarIngrediente(nome) {
+
     const { data } = await supabase
         .from('ingredientes')
         .select('*')
@@ -178,31 +216,31 @@ Responda apenas com o código.
 // WHATSAPP BOT
 // =============================
 
-const fs = require("fs");
-
 WPPConnect.create({
-  session: "bot-marmitas",
+    session: "bot-marmitas",
 
-  tokenStore: "file",
+    tokenStore: "file",
 
-  catchQR: (base64Qr) => {
-    const qr = base64Qr.replace(/^data:image\/png;base64,/, "");
-    fs.writeFileSync("qr.png", qr, "base64");
-    console.log("📲 QR Code salvo em qr.png");
-  },
+    catchQR: (base64Qr) => {
 
-  headless: true,
+        console.log("📲 QR gerado");
 
-  puppeteerOptions: {
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox"
-    ]
-  }
+        qrCodeBase64 = base64Qr;
+
+    },
+
+    headless: true,
+
+    puppeteerOptions: {
+        args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox"
+        ]
+    }
 
 })
 .then((client) => start(client))
-.catch((error) => console.log(error));;
+.catch((error) => console.log(error));
 
 function start(client) {
 
@@ -212,8 +250,6 @@ function start(client) {
 
         if (message.isGroupMsg) return;
         if (message.type !== 'chat') return;
-
-        //if (message.from === process.env.SEU_NUMERO) return;
 
         const decisao = await processarComando(message.body);
 
