@@ -178,12 +178,19 @@ Responda apenas com o código.
 // WHATSAPP BOT
 // =============================
 
+const qrcode = require('qrcode-terminal');
+
 WPPConnect.create({
   session: 'bot-marmitas',
+
   catchQR: (base64Qr) => {
-    console.log('QR Code recebido');
-    require('fs').writeFileSync('qr.png', base64Qr.split(',')[1], { encoding: 'base64' });
+    const qr = base64Qr.split(',')[1];
+    const buff = Buffer.from(qr, 'base64');
+    const qrText = buff.toString('utf8');
+
+    qrcode.generate(qrText, { small: true });
   },
+
   headless: true,
   puppeteerOptions: {
     args: ['--no-sandbox','--disable-setuid-sandbox']
