@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +14,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.97.0",
     "@wppconnect-team/wppconnect": "^1.38.0",
-    "dotenv": "^17.3.1"
+    "dotenv": "^17.3.1",
+    "express": "^4.19.2"
   }
 }
