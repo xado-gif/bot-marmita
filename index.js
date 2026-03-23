@@ -178,26 +178,31 @@ Responda apenas com o código.
 // WHATSAPP BOT
 // =============================
 
-const qrcode = require('qrcode-terminal');
+const fs = require("fs");
 
 WPPConnect.create({
-  session: 'bot-marmitas',
+  session: "bot-marmitas",
+
+  tokenStore: "file",
 
   catchQR: (base64Qr) => {
-    const qr = base64Qr.split(',')[1];
-    const buff = Buffer.from(qr, 'base64');
-    const qrText = buff.toString('utf8');
-
-    qrcode.generate(qrText, { small: true });
+    const qr = base64Qr.replace(/^data:image\/png;base64,/, "");
+    fs.writeFileSync("qr.png", qr, "base64");
+    console.log("📲 QR Code salvo em qr.png");
   },
 
   headless: true,
+
   puppeteerOptions: {
-    args: ['--no-sandbox','--disable-setuid-sandbox']
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox"
+    ]
   }
+
 })
 .then((client) => start(client))
-.catch((error) => console.log(error));
+.catch((error) => console.log(error));;
 
 function start(client) {
 
